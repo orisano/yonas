@@ -9,7 +9,7 @@ OBJS := main.o picohttpparser.o
 OBJECTS := $(addprefix $(BUILDDIR)/,$(OBJS))
 INCLUDES := include $(PICOHTTPPARSERDIR)
 
-CXXFLAGS := -O2 -std=c++11 $(addprefix -I,$(INCLUDES))
+CXXFLAGS := -Wall -Wextra -O2 -std=c++11 $(addprefix -I,$(INCLUDES))
 CFLAGS := -O2
 
 
