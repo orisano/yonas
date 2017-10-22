@@ -5,9 +5,9 @@
 #include <errno.h>  // for errno, EINTR
 #include <unistd.h> // for read, write
 
-#include "picohttpparser.h" // for phr_header, phr_parse_request
+#include <picohttpparser.h> // for phr_header, phr_parse_request
 
-#include "UnixDomainSocket.hpp" // for UnixDomainSocket
+#include <yonas/UnixDomainSocket.hpp> // for UnixDomainSocket
 
 static const char* HTTP_HEADER="HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: application/json\r\n\r\n%s\r\n";
 

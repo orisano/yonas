@@ -1,21 +1,39 @@
-TARGET = yonas
-OBJS = main.o picohttpparser.o
-CXXFLAGS = -O2 -std=c++11
-CFLAGS = -O2
+BINDIR := bin
+SRCDIR := src
+BUILDDIR := build
+DEPSDIR := deps
+PICOHTTPPARSERDIR := $(DEPSDIR)/picohttpparser
+
+TARGET := $(BINDIR)/yonas
+OBJS := main.o picohttpparser.o
+OBJECTS := $(addprefix $(BUILDDIR)/,$(OBJS))
+INCLUDES := include $(PICOHTTPPARSERDIR)
+
+CXXFLAGS := -O2 -std=c++11 $(addprefix -I,$(INCLUDES))
+CFLAGS := -O2
+
 
 all: $(TARGET)
 
 clean:
 	$(RM) $(TARGET)
-	$(RM) $(OBJS)
+	$(RM) $(OBJECTS)
 
-$(TARGET): $(OBJS)
+ensure:
+	@mkdir -p $(DEPSDIR)
+	git clone https://github.com/h2o/picohttpparser $(PICOHTTPPARSERDIR)
+
+
+$(TARGET): $(OBJECTS)
+	@mkdir -p $(BINDIR)
 	$(CXX) -o $@ $?
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
+	@mkdir -p $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $<
+$(BUILDDIR)/picohttpparser.o: $(PICOHTTPPARSERDIR)/picohttpparser.c
+	@mkdir -p $(BUILDDIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-.PHONEY: all clean
+.PHONEY: all clean ensure
