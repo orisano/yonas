@@ -1,79 +1,59 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>  // for sprintf, puts
+#include <cstring> // for strlen
+#include <csignal> // for signal, SIGPIPE, SIG_IGN
 
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <signal.h>
+#include <errno.h>  // for errno, EINTR
+#include <unistd.h> // for read, write
 
-#include "picohttpparser.h"
+#include "picohttpparser.h" // for phr_header, phr_parse_request
+
+#include "UnixDomainSocket.hpp" // for UnixDomainSocket
 
 static const char* HTTP_HEADER="HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: application/json\r\n\r\n%s\r\n";
 
 char resp_buffer[1001000];
 int response_http(int fd, const char* json) {
-  int len = sprintf(resp_buffer, HTTP_HEADER, strlen(json) + 2, json);
+  int len = std::sprintf(resp_buffer, HTTP_HEADER, std::strlen(json) + 2, json);
   return write(fd, resp_buffer, len);
 }
 
 int main() {
-  int listen_fd, r;
-  struct sockaddr_un local, remote;
+  std::signal(SIGPIPE, SIG_IGN);
 
-  signal(SIGPIPE, SIG_IGN);
-  
-  listen_fd = socket(PF_UNIX, SOCK_STREAM, 0);
-  
-  local.sun_family = AF_UNIX;
-  strcpy(local.sun_path, "yonas.sock");
-  unlink(local.sun_path);
-
-  r = bind(listen_fd, (struct sockaddr*)&local, sizeof(local));
-  if (r) {
-    perror("failed to bind");
-  }
-
-  listen(listen_fd, 100);
+  auto local = yonas::UnixDomainSocket::bind("yonas.sock");
+  local.listen(100);
   for (;;) {
-    socklen_t len = sizeof(remote);
-    int remote_fd = accept(listen_fd, (struct sockaddr*)&remote, &len);
-    if (remote_fd < 0) {
-      perror("failed to accept");
-      return 0;
-    }
+    auto remote = local.accept();
 
-    char buf[4096], *method, *path;
+    char buf[4096];
+    const char *method = nullptr;
+    const char *path = nullptr;
     int pret, minor_version;
     struct phr_header headers[100];
     size_t buflen = 0, prevbuflen = 0, method_len, path_len, num_headers;
-    ssize_t rret;
     while (1) {
-      while ((rret = read(remote_fd, buf + buflen, sizeof(buf) - buflen)) == -1 && errno == EINTR);
+      ssize_t rret;
+      while ((rret = read(remote.fd, buf + buflen, sizeof(buf) - buflen)) == -1 && errno == EINTR);
       if (rret <= 0) {
-        puts("IOError");
+        std::puts("IOError");
         goto fail;
       }
       prevbuflen = buflen;
       buflen += rret;
 
       num_headers = sizeof(headers) / sizeof(headers[0]);
-      pret = phr_parse_request(buf, buflen, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, headers, &num_headers, prevbuflen);
+      pret = phr_parse_request(buf, buflen, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers, prevbuflen);
       if (pret > 0) break;
       if (pret == -1) {
-        puts("ParseError");
+        std::puts("ParseError");
         goto fail;
       }
       if (buflen == sizeof(buf)) {
-        puts("RequestIsTooLongError");
+        std::puts("RequestIsTooLongError");
         goto fail;
       }
     }
-    response_http(remote_fd, "{\"status\": \"ok\"}"); 
+    response_http(remote.fd, "{\"status\": \"ok\"}");
 fail:;
   }
 }
